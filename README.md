@@ -722,7 +722,7 @@ python-laberinto/
 ├── build.ps1               # helper PyInstaller (genera dist/laberinto.exe)
 ├── laberinto.bat           # lanzador con menú para Windows (usa .venv)
 ├── pyproject.toml
-└── leame.md                # este archivo
+└── README.md               # este archivo
 ```
 
 ## Glosario
