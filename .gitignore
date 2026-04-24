@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# venvs
+.venv/
+venv/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code per-developer permissions (commands/skills are shared, settings is not)
+.claude/settings.local.json
+
+# Generated PDFs (output of the tool)
+laberinto_*.pdf
+
+# OS
+Thumbs.db
+.DS_Store

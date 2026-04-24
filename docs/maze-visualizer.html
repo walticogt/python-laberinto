@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Laberintos — DFS paso a paso</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --visited: #1e3a5f;
+            --stack: #334a6e;
+            --current: #3b82f6;
+            --wall: #e2e8f0;
+            --entry: #10b981;
+            --exit: #ef4444;
+            --step-idle: #334155;
+            --step-done: #10b981;
+            --step-active: #3b82f6;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 16px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 1.3rem;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+
+        /* 3-column layout on wide screens: canvas | steps | estado */
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 240px 300px;
+            gap: 14px;
+            max-width: 1500px;
+            margin: 0 auto;
+            align-items: start;
+        }
+
+        /* Medium screens: canvas on top, steps + estado side-by-side below */
+        @media (max-width: 1100px) {
+            .layout { grid-template-columns: 1fr 1fr; }
+            .main-panel { grid-column: 1 / -1; }
+        }
+
+        /* Narrow: single column */
+        @media (max-width: 700px) {
+            .layout { grid-template-columns: 1fr; }
+            .main-panel { grid-column: auto; }
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: flex;
+            flex-direction: column;
+            font-size: 0.82rem;
+            color: var(--muted);
+            gap: 4px;
+        }
+
+        input[type="number"], input[type="range"] {
+            background: #0f172a;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+
+        input[type="number"]:focus, input[type="range"]:focus {
+            outline: 2px solid var(--accent);
+            outline-offset: -1px;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 14px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--accent-hover);
+        }
+
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        button.secondary {
+            background: #475569;
+        }
+        button.secondary:hover:not(:disabled) {
+            background: #64748b;
+        }
+
+        #canvas-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #fafafa;
+            border-radius: 6px;
+            padding: 14px;
+            margin-top: 12px;
+            overflow: auto;
+        }
+
+        canvas {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 6px 12px;
+            font-size: 0.86rem;
+            margin-bottom: 12px;
+        }
+
+        .info-grid .k { color: var(--muted); }
+        .info-grid .v {
+            font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 10px;
+            margin-bottom: 12px;
+            font-size: 0.78rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        #log {
+            font-family: ui-monospace, Consolas, monospace;
+            font-size: 0.76rem;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 10px;
+            height: 260px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .log-line { color: var(--text); }
+        .log-line.pop { color: #f59e0b; }
+        .log-line.done { color: #10b981; font-weight: 600; }
+
+        h2 {
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            color: var(--muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* --- 7-step algorithm panel --- */
+        .steps-list {
+            list-style: none;
+            counter-reset: step;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .step {
+            counter-increment: step;
+            position: relative;
+            padding: 10px 10px 10px 42px;
+            border-radius: 6px;
+            background: #0f172a;
+            border: 1px solid var(--step-idle);
+            font-size: 0.82rem;
+            line-height: 1.35;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .step::before {
+            content: counter(step);
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--step-idle);
+            color: var(--text);
+            font-weight: 700;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .step:hover {
+            border-color: var(--muted);
+        }
+
+        .step.active {
+            background: rgba(59, 130, 246, 0.18);
+            border-color: var(--step-active);
+            box-shadow: 0 0 0 1px var(--step-active);
+        }
+        .step.active::before {
+            background: var(--step-active);
+            color: white;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+
+        .step.done::before {
+            background: var(--step-done);
+            color: white;
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: var(--text);
+        }
+        .step-desc {
+            color: var(--muted);
+            font-size: 0.75rem;
+            margin-top: 2px;
+        }
+
+        details {
+            margin-top: 16px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        summary {
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--muted);
+        }
+        summary:hover { color: var(--text); }
+        details[open] summary { margin-bottom: 10px; }
+        pre code {
+            display: block;
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Generador de Laberintos — DFS iterativo paso a paso</h1>
+    <div class="subtitle">
+        Mismo algoritmo que <code>maze_pdf/generator.py</code>, portado a JavaScript.
+        Ajusta los parámetros, pulsa <b>Paso</b> o <b>Play</b>, y mira el stack crecer y decrecer
+        mientras el panel central marca qué paso del algoritmo se está ejecutando.
+    </div>
+
+    <div class="layout">
+        <!-- Columna 1: canvas + controles -->
+        <div class="panel main-panel">
+            <div class="controls">
+                <label>Ancho (W)
+                    <input type="number" id="w" value="5" min="2" max="60">
+                </label>
+                <label>Alto (H)
+                    <input type="number" id="h" value="5" min="2" max="60">
+                </label>
+                <label>Seed
+                    <input type="number" id="seed" value="42">
+                </label>
+                <label>Velocidad (ms/sub-fase)
+                    <input type="range" id="speed" min="0" max="600" value="200">
+                    <span id="speed-val" style="font-family:ui-monospace,Consolas,monospace; color:var(--text); font-size:0.85rem;">200 ms</span>
+                </label>
+            </div>
+
+            <div class="button-row">
+                <button id="reset">⟲ Reset</button>
+                <button id="step">▸ Paso</button>
+                <button id="play">▶ Play</button>
+                <button id="pause" class="secondary" disabled>⏸ Pausa</button>
+                <button id="finish" class="secondary">⤓ Terminar</button>
+            </div>
+            <div class="button-row" style="margin-top:8px">
+                <button id="solve-mode" class="secondary" disabled>✏ Modo resolver</button>
+                <button id="show-solution" class="secondary" disabled>🔍 Ver solución</button>
+                <button id="clear-attempt" class="secondary" disabled>🧹 Limpiar intento</button>
+            </div>
+
+            <div id="canvas-wrap">
+                <canvas id="maze" width="500" height="500"></canvas>
+            </div>
+        </div>
+
+        <!-- Columna 2: los 7 pasos del algoritmo -->
+        <div class="panel">
+            <h2>Algoritmo (7 pasos)</h2>
+            <ol class="steps-list" id="steps">
+                <li class="step" data-step="1">
+                    <div class="step-title">Empieza en (0, 0)</div>
+                    <div class="step-desc">Marca la celda inicial como visitada y la pone en el stack.</div>
+                </li>
+                <li class="step" data-step="2">
+                    <div class="step-title">Mira vecinos no visitados</div>
+                    <div class="step-desc">Arriba, abajo, izquierda, derecha — dentro de la grilla.</div>
+                </li>
+                <li class="step" data-step="3">
+                    <div class="step-title">Elige uno al azar</div>
+                    <div class="step-desc">Si hay varios vecinos libres, tira el "dado" del PRNG.</div>
+                </li>
+                <li class="step" data-step="4">
+                    <div class="step-title">Quita pared y avanza</div>
+                    <div class="step-desc">Abre pasaje, marca el vecino como visitado, push al stack.</div>
+                </li>
+                <li class="step" data-step="5">
+                    <div class="step-title">Repite desde el paso 2</div>
+                    <div class="step-desc">La nueva celda actual es el top del stack.</div>
+                </li>
+                <li class="step" data-step="6">
+                    <div class="step-title">Sin vecinos → retrocede</div>
+                    <div class="step-desc">Pop del stack (backtrack). Vuelve al paso 2 con la celda anterior.</div>
+                </li>
+                <li class="step" data-step="7">
+                    <div class="step-title">Stack vacío → fin</div>
+                    <div class="step-desc">Abre entrada (N de la primera celda) y salida (S de la última).</div>
+                </li>
+            </ol>
+        </div>
+
+        <!-- Columna 3: estado + leyenda + log -->
+        <div class="panel">
+            <h2>Estado</h2>
+            <div class="info-grid">
+                <span class="k">Iteración</span>     <span class="v" id="i-iter">0</span>
+                <span class="k">Celda actual</span>  <span class="v" id="i-cell">—</span>
+                <span class="k">Stack depth</span>   <span class="v" id="i-depth">0</span>
+                <span class="k">Visitadas</span>     <span class="v" id="i-visited">1 / 25</span>
+                <span class="k">Última acción</span> <span class="v" id="i-action">iniciando</span>
+                <span class="k">Estado</span>        <span class="v" id="i-state">listo</span>
+            </div>
+
+            <h2>Leyenda</h2>
+            <div class="legend">
+                <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>actual</div>
+                <div class="legend-item"><span class="swatch" style="background:#334a6e"></span>en stack</div>
+                <div class="legend-item"><span class="swatch" style="background:#1e3a5f"></span>visitada</div>
+                <div class="legend-item"><span class="swatch" style="background:#fafafa"></span>no visitada</div>
+                <div class="legend-item"><span class="swatch" style="background:#facc15"></span>candidata (paso 2)</div>
+                <div class="legend-item"><span class="swatch" style="background:#10b981"></span>elegida / entrada</div>
+                <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>salida</div>
+            </div>
+
+            <h2>Log</h2>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <details>
+        <summary>Ver código JavaScript del algoritmo (el mismo que está corriendo)</summary>
+        <pre><code id="src-dump"></code></pre>
+    </details>
+
+    <script>
+    // ========================================================================
+    // Randomized DFS iterativo — port 1:1 desde maze_pdf/generator.py (Python)
+    // ========================================================================
+
+    function mulberry32(seed) {
+        let s = seed | 0;
+        return function () {
+            s = (s + 0x6D2B79F5) | 0;
+            let t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    const DIRS = [
+        { name: 'N', dx:  0, dy: -1, opp: 'S' },
+        { name: 'S', dx:  0, dy:  1, opp: 'N' },
+        { name: 'E', dx:  1, dy:  0, opp: 'W' },
+        { name: 'W', dx: -1, dy:  0, opp: 'E' },
+    ];
+
+    let W, H, seed, rng;
+    let cells, visited, stack;
+    let iteration, done, lastAction;
+    let playing = false;
+    let animating = false;    // true mientras se ejecuta una iteración (sub-fases)
+    let activeStep = 1;
+    let completedSteps = new Set();
+
+    // Estado visual intermedio — limpia al final de cada iteración
+    let highlightedNeighbors = [];  // celdas vecinas no visitadas (fase 2)
+    let pickedNeighbor = null;       // celda elegida al azar (fase 3)
+
+    // ----- Modo resolver (interactivo) -----
+    let solveMode = false;
+    let attemptPath = [];           // celdas que el usuario marcó intentando resolver
+    let solutionPath = null;         // la solución correcta (BFS) cuando se pide ver
+    let solveResult = null;          // 'win' | 'lose' | null
+
+    function makeCells(w, h) {
+        const arr = [];
+        for (let y = 0; y < h; y++) {
+            const row = [];
+            for (let x = 0; x < w; x++) {
+                row.push({ N: true, S: true, E: true, W: true });
+            }
+            arr.push(row);
+        }
+        return arr;
+    }
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const getSpeed = () => parseInt(document.getElementById('speed').value, 10);
+
+    function reset() {
+        pause();
+        animating = false;
+        W = clampInt(document.getElementById('w').value, 2, 60, 5);
+        H = clampInt(document.getElementById('h').value, 2, 60, 5);
+        seed = parseInt(document.getElementById('seed').value, 10) || 0;
+        rng = mulberry32(seed);
+
+        cells = makeCells(W, H);
+        visited = Array.from({ length: H }, () => Array(W).fill(false));
+        stack = [[0, 0]];
+        visited[0][0] = true;
+
+        iteration = 0;
+        done = false;
+        lastAction = 'push (0,0)';
+        activeStep = 1;
+        completedSteps = new Set([1]);
+        highlightedNeighbors = [];
+        pickedNeighbor = null;
+
+        // limpiar estado de modo resolver
+        solveMode = false;
+        attemptPath = [];
+        solutionPath = null;
+        solveResult = null;
+
+        clearLog();
+        logLine(`reset → W=${W}, H=${H}, seed=${seed}`);
+        logLine(`paso 1: empieza en (0,0), push al stack`);
+        redraw();
+        syncButtons();
+    }
+
+    // ============= Modo resolver =============
+
+    function bfsSolution() {
+        if (!done) return null;
+        const start = [0, 0];
+        const end = [W - 1, H - 1];
+        const parents = new Map();
+        parents.set(`${start[0]},${start[1]}`, null);
+        const q = [start];
+        const wallDirs = [
+            [0, -1, 'N'], [0, 1, 'S'], [1, 0, 'E'], [-1, 0, 'W']
+        ];
+        while (q.length) {
+            const [x, y] = q.shift();
+            if (x === end[0] && y === end[1]) break;
+            for (const [dx, dy, w] of wallDirs) {
+                if (cells[y][x][w]) continue;
+                const nx = x + dx, ny = y + dy;
+                if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+                const k = `${nx},${ny}`;
+                if (parents.has(k)) continue;
+                parents.set(k, [x, y]);
+                q.push([nx, ny]);
+            }
+        }
+        const path = [];
+        let cur = end;
+        while (cur !== null) {
+            path.push(cur);
+            cur = parents.get(`${cur[0]},${cur[1]}`);
+        }
+        return path.reverse();
+    }
+
+    function toggleSolveMode() {
+        if (!done) return;
+        solveMode = !solveMode;
+        if (solveMode) {
+            attemptPath = [[0, 0]];  // empieza en la entrada
+            solutionPath = null;
+            solveResult = null;
+            logLine(`modo resolver: arrastra/clica celdas adyacentes desde la entrada hasta la salida`);
+        } else {
+            attemptPath = [];
+            solveResult = null;
+        }
+        redraw();
+        syncButtons();
+    }
+
+    function showSolution() {
+        if (!done) return;
+        solutionPath = bfsSolution();
+        logLine(`solución BFS: ${solutionPath.length} celdas`, 'done');
+        redraw();
+    }
+
+    function clearAttempt() {
+        if (!solveMode) return;
+        attemptPath = [[0, 0]];
+        solveResult = null;
+        redraw();
+    }
+
+    function tryAddToAttempt(x, y) {
+        if (!solveMode || !done) return;
+        if (x < 0 || x >= W || y < 0 || y >= H) return;
+        if (attemptPath.length === 0) return;
+        const [lx, ly] = attemptPath[attemptPath.length - 1];
+        // Si clica en el mismo punto, ignorar.
+        if (lx === x && ly === y) return;
+        // Permitir retroceder al penúltimo (deshacer)
+        if (attemptPath.length >= 2) {
+            const [px, py] = attemptPath[attemptPath.length - 2];
+            if (px === x && py === y) {
+                attemptPath.pop();
+                solveResult = null;
+                redraw();
+                return;
+            }
+        }
+        // Sólo se puede ir a un vecino adyacente conectado por pasaje.
+        const dx = x - lx, dy = y - ly;
+        if (Math.abs(dx) + Math.abs(dy) !== 1) return;
+        let wall;
+        if (dx === 1) wall = 'E';
+        else if (dx === -1) wall = 'W';
+        else if (dy === 1) wall = 'S';
+        else wall = 'N';
+        if (cells[ly][lx][wall]) {
+            // Hay pared: movimiento no válido. Lo señalamos pero no lo agregamos.
+            logLine(`✗ pared entre (${lx},${ly}) y (${x},${y}) — no puedes pasar`, 'pop');
+            return;
+        }
+        // No permitir revisitar celdas (ya están en el path).
+        if (attemptPath.some(([ax, ay]) => ax === x && ay === y)) return;
+        attemptPath.push([x, y]);
+        // Verificar si llegó a la salida.
+        if (x === W - 1 && y === H - 1) {
+            solveResult = 'win';
+            logLine(`🎉 ¡resuelto en ${attemptPath.length - 1} pasos!`, 'done');
+        }
+        redraw();
+    }
+
+    function canvasClickToCell(evt) {
+        const canvas = document.getElementById('maze');
+        const rect = canvas.getBoundingClientRect();
+        const x = evt.clientX - rect.left;
+        const y = evt.clientY - rect.top;
+        const cellPx = Math.floor(Math.min(500 / W, 500 / H));
+        const cx = Math.floor(x / cellPx);
+        const cy = Math.floor(y / cellPx);
+        return [cx, cy];
+    }
+
+    // step() ejecuta UNA iteración del algoritmo en 3 sub-fases animadas:
+    //   fase A (paso 2): resalta los vecinos candidatos
+    //   fase B (paso 3 o 6): resalta el elegido  /  marca backtrack
+    //   fase C (paso 4 o pop final): quita la pared + avanza, o hace el pop
+    // Entre cada sub-fase hay una pausa controlable por el slider "Velocidad".
+    async function step() {
+        if (done || animating) return;
+        animating = true;
+        syncButtons();
+
+        try {
+            if (stack.length === 0) {
+                // Paso 7 — terminación
+                cells[0][0].N = false;
+                cells[H - 1][W - 1].S = false;
+                done = true;
+                lastAction = 'fin: entrada y salida abiertas';
+                activeStep = 7;
+                completedSteps.add(7);
+                logLine(`✓ stack vacío → paso 7 (abrir entrada/salida). DONE.`, 'done');
+                redraw();
+                return;
+            }
+
+            iteration++;
+            const [cx, cy] = stack[stack.length - 1];
+
+            // ---------- Sub-fase A (paso 2): mirar vecinos ----------
+            activeStep = 2;
+            const neigh = [];
+            for (const d of DIRS) {
+                const nx = cx + d.dx;
+                const ny = cy + d.dy;
+                if (nx >= 0 && nx < W && ny >= 0 && ny < H && !visited[ny][nx]) {
+                    neigh.push({ nx, ny, dir: d });
+                }
+            }
+            highlightedNeighbors = neigh;
+            completedSteps.add(2);
+            lastAction = `mirando vecinos de (${cx},${cy}): ${neigh.length} candidato(s)`;
+            logLine(`iter ${iteration} · paso 2: (${cx},${cy}) tiene ${neigh.length} vecino(s) sin visitar`);
+            redraw();
+            await sleep(getSpeed());
+            if (!animating) return; // cancelado por reset/pause
+
+            if (neigh.length === 0) {
+                // ---------- Sub-fase B' (paso 6): backtrack ----------
+                activeStep = 6;
+                completedSteps.add(6);
+                lastAction = `sin vecinos → preparando pop`;
+                logLine(`iter ${iteration} · paso 6: preparando backtrack de (${cx},${cy})`, 'pop');
+                redraw();
+                await sleep(getSpeed());
+                if (!animating) return;
+
+                // ---------- Sub-fase C' (pop efectivo) ----------
+                stack.pop();
+                highlightedNeighbors = [];
+                lastAction = `pop (${cx},${cy}) — backtrack`;
+                logLine(`iter ${iteration} · pop: tope=${stack.length}`, 'pop');
+                redraw();
+            } else {
+                // ---------- Sub-fase B (paso 3): elegir al azar ----------
+                const pick = neigh[Math.floor(rng() * neigh.length)];
+                activeStep = 3;
+                completedSteps.add(3);
+                pickedNeighbor = pick;
+                lastAction = `elegido: (${pick.nx},${pick.ny}) dir=${pick.dir.name}`;
+                logLine(`iter ${iteration} · paso 3: elegido (${pick.nx},${pick.ny}) al azar de ${neigh.length}`);
+                redraw();
+                await sleep(getSpeed());
+                if (!animating) return;
+
+                // ---------- Sub-fase C (paso 4): quitar pared + avanzar ----------
+                activeStep = 4;
+                completedSteps.add(4);
+                completedSteps.add(5);
+                cells[cy][cx][pick.dir.name] = false;
+                cells[pick.ny][pick.nx][pick.dir.opp] = false;
+                visited[pick.ny][pick.nx] = true;
+                stack.push([pick.nx, pick.ny]);
+                highlightedNeighbors = [];
+                pickedNeighbor = null;
+                lastAction = `(${cx},${cy}) —${pick.dir.name}→ (${pick.nx},${pick.ny})`;
+                logLine(`iter ${iteration} · paso 4: pared -${pick.dir.name}- removida, push (${pick.nx},${pick.ny}) | tope=${stack.length}`);
+                redraw();
+            }
+        } finally {
+            animating = false;
+            syncButtons();
+        }
+    }
+
+    function redraw() {
+        draw();
+        updateInfo();
+        updateStepHighlight();
+    }
+
+    // Terminar: corre el algoritmo sin animaciones
+    function finish() {
+        pause();
+        animating = false;
+        highlightedNeighbors = [];
+        pickedNeighbor = null;
+        while (!done) {
+            if (stack.length === 0) {
+                cells[0][0].N = false;
+                cells[H - 1][W - 1].S = false;
+                done = true;
+                activeStep = 7;
+                completedSteps.add(7);
+                break;
+            }
+            iteration++;
+            const [cx, cy] = stack[stack.length - 1];
+            const neigh = [];
+            for (const d of DIRS) {
+                const nx = cx + d.dx, ny = cy + d.dy;
+                if (nx >= 0 && nx < W && ny >= 0 && ny < H && !visited[ny][nx]) {
+                    neigh.push({ nx, ny, dir: d });
+                }
+            }
+            if (neigh.length === 0) {
+                stack.pop();
+            } else {
+                const pick = neigh[Math.floor(rng() * neigh.length)];
+                cells[cy][cx][pick.dir.name] = false;
+                cells[pick.ny][pick.nx][pick.dir.opp] = false;
+                visited[pick.ny][pick.nx] = true;
+                stack.push([pick.nx, pick.ny]);
+            }
+        }
+        lastAction = 'terminado (modo rápido)';
+        logLine(`⚡ terminado en ${iteration} iteraciones (modo rápido, sin animaciones)`, 'done');
+        redraw();
+        syncButtons();
+    }
+
+    async function play() {
+        if (done || playing) return;
+        playing = true;
+        syncButtons();
+        while (playing && !done) {
+            await step();
+            if (!playing || done) break;
+            await sleep(Math.max(30, getSpeed() / 4)); // pequeña pausa entre iteraciones
+        }
+        syncButtons();
+    }
+
+    function pause() {
+        playing = false;
+        syncButtons();
+    }
+
+    function syncButtons() {
+        document.getElementById('play').disabled   = playing || done;
+        document.getElementById('pause').disabled  = !playing;
+        document.getElementById('step').disabled   = playing || done || animating;
+        document.getElementById('finish').disabled = playing || done;
+        // Modo resolver: solo activo cuando el laberinto está terminado.
+        const solveBtn = document.getElementById('solve-mode');
+        const showBtn = document.getElementById('show-solution');
+        const clearBtn = document.getElementById('clear-attempt');
+        if (solveBtn) solveBtn.disabled = !done;
+        if (showBtn) showBtn.disabled = !done;
+        if (clearBtn) clearBtn.disabled = !solveMode;
+        if (solveBtn) solveBtn.textContent = solveMode ? '✏ Salir del modo resolver' : '✏ Modo resolver';
+        // Cambiar el cursor del canvas
+        const canvas = document.getElementById('maze');
+        if (canvas) canvas.style.cursor = solveMode ? 'crosshair' : 'default';
+    }
+
+    // ------ Canvas render ------
+    function draw() {
+        const canvas = document.getElementById('maze');
+        const ctx = canvas.getContext('2d');
+        const maxSize = 500;
+        const cellPx = Math.floor(Math.min(maxSize / W, maxSize / H));
+        canvas.width  = cellPx * W + 2;
+        canvas.height = cellPx * H + 2;
+
+        ctx.fillStyle = '#fafafa';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = getCss('--visited');
+        for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+                if (visited[y][x]) {
+                    ctx.fillRect(x * cellPx + 1, y * cellPx + 1, cellPx, cellPx);
+                }
+            }
+        }
+
+        ctx.fillStyle = getCss('--stack');
+        for (const [sx, sy] of stack) {
+            ctx.fillRect(sx * cellPx + 1, sy * cellPx + 1, cellPx, cellPx);
+        }
+
+        if (stack.length > 0 && !done) {
+            const [cx, cy] = stack[stack.length - 1];
+            ctx.fillStyle = getCss('--current');
+            ctx.fillRect(cx * cellPx + 1, cy * cellPx + 1, cellPx, cellPx);
+        }
+
+        // Sub-fase A: vecinos candidatos (paso 2) — overlay amarillo semi-transparente
+        if (highlightedNeighbors.length > 0) {
+            ctx.fillStyle = 'rgba(250, 204, 21, 0.55)';  // amber 400
+            for (const n of highlightedNeighbors) {
+                ctx.fillRect(n.nx * cellPx + 1, n.ny * cellPx + 1, cellPx, cellPx);
+            }
+            // Borde punteado
+            ctx.save();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]);
+            for (const n of highlightedNeighbors) {
+                ctx.strokeRect(n.nx * cellPx + 2, n.ny * cellPx + 2, cellPx - 2, cellPx - 2);
+            }
+            ctx.restore();
+        }
+
+        // Sub-fase B: vecino elegido (paso 3) — overlay verde + flecha
+        if (pickedNeighbor) {
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.65)';  // emerald 500
+            ctx.fillRect(pickedNeighbor.nx * cellPx + 1, pickedNeighbor.ny * cellPx + 1, cellPx, cellPx);
+            // Flecha desde la celda actual hacia el elegido
+            if (stack.length > 0) {
+                const [cx, cy] = stack[stack.length - 1];
+                drawArrow(
+                    ctx,
+                    cx * cellPx + cellPx / 2 + 1,
+                    cy * cellPx + cellPx / 2 + 1,
+                    pickedNeighbor.nx * cellPx + cellPx / 2 + 1,
+                    pickedNeighbor.ny * cellPx + cellPx / 2 + 1,
+                    cellPx
+                );
+            }
+        }
+
+        if (done) {
+            ctx.fillStyle = getCss('--entry');
+            ctx.fillRect(0 * cellPx + 1, 0 * cellPx + 1, cellPx, cellPx);
+            ctx.fillStyle = getCss('--exit');
+            ctx.fillRect((W - 1) * cellPx + 1, (H - 1) * cellPx + 1, cellPx, cellPx);
+        }
+
+        // ----- Modo resolver: intento del usuario en azul claro -----
+        if (solveMode && attemptPath.length > 1) {
+            const ok = solveResult === 'win';
+            ctx.save();
+            ctx.strokeStyle = ok ? '#10b981' : '#60a5fa';
+            ctx.lineWidth = Math.max(2, cellPx * 0.18);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            const [x0, y0] = attemptPath[0];
+            ctx.moveTo(x0 * cellPx + cellPx / 2 + 1, y0 * cellPx + cellPx / 2 + 1);
+            for (let i = 1; i < attemptPath.length; i++) {
+                const [px, py] = attemptPath[i];
+                ctx.lineTo(px * cellPx + cellPx / 2 + 1, py * cellPx + cellPx / 2 + 1);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // ----- Solución BFS: rojo punteado -----
+        if (solutionPath && solutionPath.length > 1) {
+            ctx.save();
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = Math.max(2, cellPx * 0.13);
+            ctx.lineCap = 'round';
+            ctx.setLineDash([cellPx * 0.25, cellPx * 0.18]);
+            ctx.beginPath();
+            const [sx, sy] = solutionPath[0];
+            ctx.moveTo(sx * cellPx + cellPx / 2 + 1, sy * cellPx + cellPx / 2 + 1);
+            for (let i = 1; i < solutionPath.length; i++) {
+                const [px, py] = solutionPath[i];
+                ctx.lineTo(px * cellPx + cellPx / 2 + 1, py * cellPx + cellPx / 2 + 1);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = Math.max(1, Math.min(3, cellPx * 0.08));
+        ctx.lineCap = 'butt';
+        ctx.beginPath();
+        for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+                const c = cells[y][x];
+                const px = x * cellPx + 1;
+                const py = y * cellPx + 1;
+                if (c.N) { ctx.moveTo(px, py); ctx.lineTo(px + cellPx, py); }
+                if (c.W) { ctx.moveTo(px, py); ctx.lineTo(px, py + cellPx); }
+                if (y === H - 1 && c.S) { ctx.moveTo(px, py + cellPx); ctx.lineTo(px + cellPx, py + cellPx); }
+                if (x === W - 1 && c.E) { ctx.moveTo(px + cellPx, py); ctx.lineTo(px + cellPx, py + cellPx); }
+            }
+        }
+        ctx.stroke();
+    }
+
+    function updateInfo() {
+        document.getElementById('i-iter').textContent = iteration;
+        document.getElementById('i-depth').textContent = stack.length;
+        const vcount = visited.flat().filter(Boolean).length;
+        document.getElementById('i-visited').textContent = `${vcount} / ${W * H}`;
+        document.getElementById('i-cell').textContent =
+            stack.length > 0 ? `(${stack[stack.length - 1][0]}, ${stack[stack.length - 1][1]})` : '—';
+        document.getElementById('i-action').textContent = lastAction;
+        document.getElementById('i-state').textContent = done ? 'completo' : (playing ? 'reproduciendo' : 'pausado');
+    }
+
+    function updateStepHighlight() {
+        const steps = document.querySelectorAll('.step');
+        steps.forEach(el => {
+            const n = parseInt(el.dataset.step, 10);
+            el.classList.remove('active', 'done');
+            if (n === activeStep) {
+                el.classList.add('active');
+            } else if (completedSteps.has(n)) {
+                el.classList.add('done');
+            }
+        });
+    }
+
+    function logLine(text, cls = '') {
+        const log = document.getElementById('log');
+        const div = document.createElement('div');
+        div.className = 'log-line ' + cls;
+        div.textContent = text;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function clearLog() {
+        document.getElementById('log').innerHTML = '';
+    }
+
+    function clampInt(val, lo, hi, dflt) {
+        const n = parseInt(val, 10);
+        if (isNaN(n)) return dflt;
+        return Math.max(lo, Math.min(hi, n));
+    }
+
+    function getCss(varName) {
+        return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    }
+
+    function drawArrow(ctx, x1, y1, x2, y2, cellPx) {
+        const headLen = Math.max(6, cellPx * 0.25);
+        const ang = Math.atan2(y2 - y1, x2 - x1);
+        ctx.save();
+        ctx.strokeStyle = '#065f46'; // emerald 800
+        ctx.fillStyle = '#065f46';
+        ctx.lineWidth = Math.max(2, cellPx * 0.06);
+        ctx.lineCap = 'round';
+        // cuerpo — se queda un poco antes del centro del destino
+        const shrink = headLen * 0.7;
+        const ex = x2 - Math.cos(ang) * shrink;
+        const ey = y2 - Math.sin(ang) * shrink;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        // cabeza
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(ang - Math.PI / 6), y2 - headLen * Math.sin(ang - Math.PI / 6));
+        ctx.lineTo(x2 - headLen * Math.cos(ang + Math.PI / 6), y2 - headLen * Math.sin(ang + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // Controls
+    document.getElementById('reset').addEventListener('click', reset);
+    document.getElementById('step').addEventListener('click', step);
+    document.getElementById('play').addEventListener('click', play);
+    document.getElementById('pause').addEventListener('click', pause);
+    document.getElementById('finish').addEventListener('click', finish);
+
+    document.getElementById('speed').addEventListener('input', (e) => {
+        document.getElementById('speed-val').textContent = `${e.target.value} ms`;
+        if (playing) { pause(); play(); }
+    });
+
+    // Click a step to "step" the algorithm forward (manual control hook)
+    document.querySelectorAll('.step').forEach(el => {
+        el.addEventListener('click', () => {
+            if (!playing && !done) step();
+        });
+    });
+
+    // Botones de modo resolver
+    document.getElementById('solve-mode').addEventListener('click', toggleSolveMode);
+    document.getElementById('show-solution').addEventListener('click', showSolution);
+    document.getElementById('clear-attempt').addEventListener('click', clearAttempt);
+
+    // Canvas: click + drag para ir marcando celdas durante el modo resolver
+    const canvasEl = document.getElementById('maze');
+    let dragging = false;
+    canvasEl.addEventListener('mousedown', (e) => {
+        if (!solveMode) return;
+        dragging = true;
+        const [x, y] = canvasClickToCell(e);
+        tryAddToAttempt(x, y);
+    });
+    canvasEl.addEventListener('mousemove', (e) => {
+        if (!solveMode || !dragging) return;
+        const [x, y] = canvasClickToCell(e);
+        tryAddToAttempt(x, y);
+    });
+    window.addEventListener('mouseup', () => { dragging = false; });
+    canvasEl.addEventListener('mouseleave', () => { dragging = false; });
+
+    reset();
+
+    document.getElementById('src-dump').textContent = `// Los 7 pasos del panel mapean a este código:
+function step() {
+    if (stack.length === 0) {
+        // --- PASO 7: stack vacío → abrir entrada/salida, FIN ---
+        cells[0][0].N = false;
+        cells[H-1][W-1].S = false;
+        done = true;
+        return;
+    }
+
+    const [cx, cy] = stack[stack.length - 1];
+
+    // --- PASO 2: mirar vecinos no visitados ---
+    const neigh = [];
+    for (const d of DIRS) {
+        const nx = cx + d.dx, ny = cy + d.dy;
+        if (nx >= 0 && nx < W && ny >= 0 && ny < H && !visited[ny][nx]) {
+            neigh.push({ nx, ny, dir: d });
+        }
+    }
+
+    if (neigh.length === 0) {
+        // --- PASO 6: sin vecinos → pop (backtrack) ---
+        stack.pop();
+    } else {
+        // --- PASO 3: elegir al azar ---
+        const pick = neigh[Math.floor(rng() * neigh.length)];
+
+        // --- PASO 4: quitar pared y avanzar ---
+        cells[cy][cx][pick.dir.name] = false;
+        cells[pick.ny][pick.nx][pick.dir.opp] = false;
+        visited[pick.ny][pick.nx] = true;
+        stack.push([pick.nx, pick.ny]);
+    }
+    // --- PASO 5: (implícito) la próxima iteración trabaja con el nuevo top ---
+}`;
+    </script>
+</body>
+</html>
