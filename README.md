@@ -2,7 +2,7 @@
 
 CLI en Python que genera laberintos imprimibles en PDF, con tres niveles de dificultad editables, múltiples páginas por PDF, dos algoritmos (DFS / Prim) y opción de imprimir la solución.
 
-![badge](https://img.shields.io/badge/python-3.11%2B-blue) ![badge](https://img.shields.io/badge/tests-60%20passing-brightgreen) ![badge](https://img.shields.io/badge/license-MIT-blue)
+[![tests](https://github.com/walticogt/python-laberinto/actions/workflows/test.yml/badge.svg)](https://github.com/walticogt/python-laberinto/actions/workflows/test.yml) ![python](https://img.shields.io/badge/python-3.11%2B-blue) ![tests-count](https://img.shields.io/badge/tests-60%20passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) [![demo](https://img.shields.io/badge/demo-online-3b82f6)](https://walticogt.github.io/python-laberinto/maze-visualizer.html)
 
 <!--
 Para añadir un GIF demo del visualizador:
@@ -599,13 +599,19 @@ Contemos: 9 celdas, 8 pasajes (N·M − 1 = 8 ✓). El camino de entrada a salid
 
 Hay un **visualizador interactivo en HTML + JavaScript** en [docs/maze-visualizer.html](docs/maze-visualizer.html) que ejecuta el mismo algoritmo que el generador Python y te deja ver cada iteración.
 
-#### Tres formas de abrirlo
+#### Cuatro formas de abrirlo
 
-**A) Doble clic (local)** — la más simple. Abre [docs/maze-visualizer.html](docs/maze-visualizer.html) con doble clic desde el explorador de archivos; carga en cualquier navegador moderno sin servidor.
+**A) En vivo (ya hosteado)** — la más cómoda si solo quieres probarlo:
 
-**B) GitHub Pages** — para tener una URL pública compartible. Una vez que hayas hecho push del repo a GitHub: Settings → Pages → Source: `main` / `/docs`. Obtienes `https://<usuario>.github.io/<repo>/maze-visualizer.html`.
+> **🔗 https://walticogt.github.io/python-laberinto/maze-visualizer.html**
 
-**C) Drag-and-drop a un host estático** — Netlify / Vercel / Cloudflare Pages. Arrastra el archivo `.html` (o toda la carpeta `docs/`) y te dan una URL en segundos.
+Hosteado gratis vía GitHub Pages desde la carpeta `docs/` de este repo.
+
+**B) Doble clic (local)** — abre [docs/maze-visualizer.html](docs/maze-visualizer.html) desde el explorador de archivos; carga en cualquier navegador moderno sin servidor.
+
+**C) Tu propio GitHub Pages** — si forkeas o cloneas: Settings → Pages → Source: `Deploy from a branch` → Branch: `main` / `/docs` → Save. Obtienes `https://<tu-usuario>.github.io/<repo>/maze-visualizer.html`.
+
+**D) Drag-and-drop a un host estático** — Netlify / Vercel / Cloudflare Pages. Arrastra el archivo `.html` (o toda la carpeta `docs/`) y te dan una URL en segundos.
 
 > **Sobre `<iframe>` en este README**: GitHub/GitLab sanean HTML interactivo en los `.md`, así que un `<iframe src="docs/maze-visualizer.html">` no renderiza en esas plataformas. VSCode sí lo renderiza en la previsualización local pero con restricciones de CORS. Por eso la recomendación es **link directo** (arriba) en vez de embed.
 
