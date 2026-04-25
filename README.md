@@ -256,26 +256,26 @@ La flecha punteada a `reportlab` es un **lazy import** — solo se importa cuand
 
 ```mermaid
 flowchart TD
-    Start([Usuario ejecuta `laberinto`]) --> UTF8[Forzar stdout/stderr a UTF-8]
-    UTF8 --> Parse[Parsear argumentos con argparse]
-    Parse --> ValP{--pages válido?<br/>1 ≤ N ≤ 10}
-    ValP -->|No| Err2([exit 2 + mensaje])
-    ValP -->|Sí| Load[load_presets / leer ~/.laberinto.json]
-    Load --> HasDiff{¿--difficulty?}
+    Start(["Usuario ejecuta laberinto"]) --> UTF8["Forzar stdout/stderr a UTF-8"]
+    UTF8 --> Parse["Parsear argumentos con argparse"]
+    Parse --> ValP{"--pages válido?<br/>1 ≤ N ≤ 10"}
+    ValP -->|No| Err2(["exit 2 + mensaje"])
+    ValP -->|Sí| Load["load_presets / leer ~/.laberinto.json"]
+    Load --> HasDiff{"¿--difficulty?"}
     HasDiff -->|Sí| Gen
-    HasDiff -->|No| Menu[Mostrar menú]
-    Menu --> Choice{Opción}
-    Choice -->|1/2/3| SelDiff[Seleccionar dificultad]
-    Choice -->|4| Edit[Editar presets<br/>→ save_presets]
-    Choice -->|5| Exit0([exit 0])
+    HasDiff -->|No| Menu["Mostrar menú"]
+    Menu --> Choice{"Opción"}
+    Choice -->|1/2/3| SelDiff["Seleccionar dificultad"]
+    Choice -->|4| Edit["Editar presets<br/>save_presets"]
+    Choice -->|5| Exit0(["exit 0"])
     Edit --> Menu
-    SelDiff --> PromptP[Prompt nro de páginas<br/>default 1, max 10]
-    PromptP --> Gen[Generar N laberintos<br/>con seed+i si aplica]
-    Gen --> Render[render_to_pdf<br/>→ escribir 1 página por maze]
-    Render --> Print[Imprimir ruta del PDF]
-    Print --> NoOpen{--no-open?}
+    SelDiff --> PromptP["Prompt nro de páginas<br/>default 1, max 10"]
+    PromptP --> Gen["Generar N laberintos<br/>con seed+i si aplica"]
+    Gen --> Render["render_to_pdf<br/>escribir 1 página por maze"]
+    Render --> Print["Imprimir ruta del PDF"]
+    Print --> NoOpen{"--no-open?"}
     NoOpen -->|Sí| Exit0
-    NoOpen -->|No| Open[opener.open_file<br/>os.startfile / xdg-open / open]
+    NoOpen -->|No| Open["opener.open_file<br/>os.startfile / xdg-open / open"]
     Open --> Exit0
 ```
 
@@ -367,18 +367,18 @@ función generate(W, H, seed):
 
 ```mermaid
 flowchart TD
-    Start([stack = [(0,0)]<br/>visited = {(0,0)}]) --> Empty{stack vacío?}
-    Empty -->|Sí| Open[Abrir entrada y salida]
-    Open --> Done([Retornar Maze])
+    Start(["stack = [(0,0)]<br/>visited = {(0,0)}"]) --> Empty{"stack vacío?"}
+    Empty -->|Sí| Open["Abrir entrada y salida"]
+    Open --> Done(["Retornar Maze"])
     Empty -->|No| Peek["x,y = stack.top()"]
     Peek --> Neighbors["vecinos = celdas adyacentes<br/>dentro de la grilla<br/>que NO estén en visited"]
-    Neighbors --> HasN{¿Hay vecinos?}
-    HasN -->|No<br/>dead end| Pop[stack.pop<br/>backtrack]
+    Neighbors --> HasN{"¿Hay vecinos?"}
+    HasN -->|"No (dead end)"| Pop["stack.pop (backtrack)"]
     Pop --> Empty
-    HasN -->|Sí| Pick[nx, ny = rng.choice vecinos]
-    Pick --> Carve["Quitar pared entre x,y y nx,ny<br/>en ambos lados"]
+    HasN -->|Sí| Pick["nx, ny = rng.choice(vecinos)"]
+    Pick --> Carve["Quitar pared entre (x,y) y (nx,ny)<br/>en ambos lados"]
     Carve --> Mark["visited[ny][nx] = True"]
-    Mark --> Push[stack.push nx, ny]
+    Mark --> Push["stack.push((nx, ny))"]
     Push --> Empty
 ```
 
